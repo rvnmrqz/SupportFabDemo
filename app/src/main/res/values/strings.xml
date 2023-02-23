@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">SupportFab</string>
+    <string name="fab_video_call">Video chat</string>
+    <string name="fab_voice_call">Talk to us</string>
+    <string name="fab_text_chat">Text us</string>
+    <string name="fab_toggle_position">Move position</string>
+    <string name="fab_toggle_side_gravity">Toggle side gravity</string>
+    <string name="fab_toggle_drag">Toggle drag ability</string>
+</resources>
