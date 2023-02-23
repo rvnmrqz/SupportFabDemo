@@ -1,6 +1,7 @@
-package com.example.supportfab
+package com.example.supportfab.custom_fab
 
 
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -8,37 +9,15 @@ import android.view.animation.Animation
 import android.widget.LinearLayout
 import androidx.core.view.children
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.LifecycleOwner
+import com.example.supportfab.App
+
+private const val TAG = "ChatSupportButton"
 
 class ChatSupportButton {
 
+    //region top variables
     private lateinit var builder: ChatSupportBuilder
-
-    constructor(view: FragmentActivity){
-        initBuilder()
-        builder.addToFragmentActivity(view)
-    }
-
-    constructor(viewGroup: ViewGroup){
-        initBuilder()
-        builder.addToViewGroup(viewGroup)
-    }
-    constructor(fab: DraggableFloatingActionButton){
-        initBuilder()
-        builder.applyToFab(fab)
-    }
-
-    private fun initBuilder(){
-        //load CMS value here
-        builder = ChatSupportBuilder()
-            .setMargin(24)
-            .enableSideGravity(false)
-            .enableLiveVideoCallOption()
-            .enableLiveTextChatOption()
-            .enableLiveVoiceCallOption()
-
-        builder.liveSupportButtonClickListener = liveSupportButtonClickListener
-        builder.fabCallback = mainFabCallBack
-    }
 
     private val mainFab: DraggableFloatingActionButton?
         get() {
@@ -50,11 +29,43 @@ class ChatSupportButton {
             return builder.optionsContainer
         }
 
+    private val isBuildComplete: Boolean
+        get() = builder.buildComplete
+
     private var isSupportOngoing = false
     private var isExpanded: Boolean = false
     private var isDraggedWhileOpened = false
+    //endregion
 
-    var sessionListener: ChatSupportSessionListener? = null
+    //region constructors
+    constructor(view: FragmentActivity) {
+        initBuilder()
+        builder.addToFragmentActivity(view)
+    }
+
+    constructor(viewGroup: ViewGroup) {
+        initBuilder()
+        builder.addToViewGroup(viewGroup)
+    }
+
+    constructor(fab: DraggableFloatingActionButton) {
+        initBuilder()
+        builder.applyToFab(fab)
+    }
+
+    private fun initBuilder() {
+        //load CMS value here
+        builder = ChatSupportBuilder()
+            .setMargin(24)
+            .enableSideGravity(false)
+            .enableLiveVideoCallOption()
+            .enableLiveTextChatOption()
+            .enableLiveVoiceCallOption()
+
+        builder.supportButtonOnClickCallback = supportButtonOnClickCallback
+        builder.fabCallback = mainFabCallBack
+    }
+    //endregion
 
     //region animations
     private val showToTopAnimation: Animation?
@@ -78,7 +89,11 @@ class ChatSupportButton {
         }
     //endregion
 
-    private var liveSupportButtonClickListener : LiveSupportButtonClickListener? = null
+    //region callbacks
+    var sessionListener: ChatSupportSessionListener? = null
+
+    private var supportButtonOnClickCallback: SupportButtonOnClickCallback? = null
+
     private val mainFabCallBack: FabCallbacks = object : FabCallbacks {
         override fun onDragStarted(x: Float, y: Float) {
             if (isExpanded) isDraggedWhileOpened = true
@@ -92,6 +107,7 @@ class ChatSupportButton {
                 isDraggedWhileOpened = false
                 expandOptions()
             }
+            App.instance.updateFabPosition(x, y)
         }
 
         override fun onClicked(x: Float, y: Float) {
@@ -101,15 +117,27 @@ class ChatSupportButton {
                 toggleOptions()
         }
     }
+    //endregion
 
-    private val isBuildComplete: Boolean
-        get() = builder.buildComplete
-
-
-    fun setSessionListener(sessionListener: ChatSupportSessionListener): ChatSupportButton{
+    fun setSessionListener(sessionListener: ChatSupportSessionListener): ChatSupportButton {
         this.sessionListener = sessionListener
         return this
     }
+
+    fun lifeCycleOwner(owner: LifecycleOwner): ChatSupportButton {
+        App.instance.fabState.observe(owner) { state ->
+
+            //updates the value of initial position
+            builder.setInitialPosition(state.x, state.y)
+
+            //request for position update if ever mainFab is already build
+            state.x?.let { mainFab?.x = it }
+            state.y?.let { mainFab?.y = it }
+            mainFab?.requestLayout()
+        }
+        return this
+    }
+
     fun show(show: Boolean = true) {
         mainFab?.visibility = if (show) View.VISIBLE else View.GONE
     }

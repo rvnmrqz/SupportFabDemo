@@ -1,4 +1,4 @@
-package com.example.supportfab
+package com.example.supportfab.custom_fab
 
 import android.animation.Animator
 import android.animation.Animator.AnimatorListener
@@ -162,7 +162,6 @@ open class DraggableFloatingActionButton : FloatingActionButton, OnTouchListener
         }
     }
 
-    //region SCREEN POSITIONS
     fun toTopRight() {
         loadViewSpecs()
         val layoutParams = this.layoutParams as MarginLayoutParams

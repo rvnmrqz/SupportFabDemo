@@ -1,4 +1,4 @@
-package com.example.supportfab
+package com.example.supportfab.custom_fab
 
 
 import android.content.res.ColorStateList
@@ -10,6 +10,7 @@ import android.view.animation.AnimationUtils
 import android.widget.LinearLayout
 import androidx.core.view.*
 import androidx.fragment.app.FragmentActivity
+import com.example.supportfab.R
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 
 class ChatSupportBuilder{
@@ -64,13 +65,15 @@ class ChatSupportBuilder{
     private var isVoiceCallEnabled = false
     private var isTestButtonsEnabled = false
 
-    private var buildInitiated = false
+    private var fabInitialXPosition: Float? = null
+    private var fabInitialYPosition: Float? = null
 
+    private var buildInitiated = false
     var buildComplete = false
         private set
 
     //callbacks
-    var liveSupportButtonClickListener: LiveSupportButtonClickListener? = null
+    var supportButtonOnClickCallback: SupportButtonOnClickCallback? = null
     var fabCallback: FabCallbacks? = null
 
     //region builder
@@ -133,6 +136,11 @@ class ChatSupportBuilder{
             mainFab?.requestLayout()
         }
         return this
+    }
+
+    fun setInitialPosition(x:Float?, y:Float?){
+        fabInitialXPosition = x
+        fabInitialYPosition = y
     }
     //endregion
 
@@ -200,11 +208,21 @@ class ChatSupportBuilder{
         fab.requestLayout()
 
         //set initial position
-        parentContainer?.let {
-            it.post {
-                //bottom right
-                fab.x = (it.width - fab.width - fab.marginEnd).toFloat()
-                fab.y = (it.height - fab.height - fab.marginBottom).toFloat()
+        parentContainer?.let {viewGroup ->
+            viewGroup.post {
+                fabInitialXPosition?.let {
+                    fab.x = it
+                } ?: run {
+                    //bottom right
+                    fab.x = (viewGroup.width - fab.width - fab.marginEnd).toFloat()
+                }
+
+                fabInitialYPosition?.let {
+                    fab.y = it
+                } ?: run {
+                    //bottom right
+                    fab.y = (viewGroup.height - fab.height - fab.marginBottom).toFloat()
+                }
             }
         }
 
@@ -257,7 +275,7 @@ class ChatSupportBuilder{
 
             //click listener
             videoFab.setOnClickListener {
-                liveSupportButtonClickListener?.onVideoCallClicked()
+                supportButtonOnClickCallback?.onVideoCallClicked()
             }
         }
     }
@@ -294,7 +312,7 @@ class ChatSupportBuilder{
 
             //click listener
             textFab.setOnClickListener {
-                liveSupportButtonClickListener?.onTextChatClicked()
+                supportButtonOnClickCallback?.onTextChatClicked()
             }
         }
     }
@@ -331,7 +349,7 @@ class ChatSupportBuilder{
 
             //click listener
             talkFab.setOnClickListener {
-                liveSupportButtonClickListener?.onVoiceCallClicked()
+                supportButtonOnClickCallback?.onVoiceCallClicked()
             }
         }
     }
@@ -492,7 +510,7 @@ class ChatSupportBuilder{
     }
 }
 
-interface LiveSupportButtonClickListener {
+interface SupportButtonOnClickCallback {
     fun onVideoCallClicked()
     fun onVoiceCallClicked()
     fun onTextChatClicked()
