@@ -13,8 +13,9 @@ import androidx.fragment.app.FragmentActivity
 import com.example.supportfab.R
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 
-class ChatSupportBuilder{
+class ChatSupportComponentBuilder {
 
+    //region top variables
     var mainFab: DraggableFloatingActionButton? = null
         private set
 
@@ -22,6 +23,40 @@ class ChatSupportBuilder{
         private set
 
     private var parentContainer: ViewGroup? = null
+
+    private var isDragEnabled: Boolean? = null
+    private var isSideGravityEnabled: Boolean? = null
+
+    private var isVideoChatEnabled = false
+    private var isTextChatEnabled = false
+    private var isVoiceCallEnabled = false
+    private var isTestButtonsEnabled = false
+
+    private var icon: Int? = null
+    private var fabInitialXPosition: Float? = null
+    private var fabInitialYPosition: Float? = null
+    private var fabInitiallyExpanded: Boolean? = false
+
+    private var buildInitiated = false
+    var buildComplete = false
+        private set
+    //endregion
+
+    //region constructors
+    constructor(view: FragmentActivity) {
+        parentContainer = view.findViewById(android.R.id.content)
+    }
+
+    constructor(fab: DraggableFloatingActionButton) {
+        mainFab = fab
+        parentContainer = fab.parent as ViewGroup
+    }
+
+    constructor(viewGroup: ViewGroup) {
+        parentContainer = viewGroup
+    }
+
+    //endregion
 
     //region margins
     private val DEFAULT_MARGIN = 16
@@ -57,57 +92,43 @@ class ChatSupportBuilder{
         }
     //endregion
 
-    private var isDragEnabled: Boolean? = null
-    private var isSideGravityEnabled: Boolean? = null
-
-    private var isVideoChatEnabled = false
-    private var isTextChatEnabled = false
-    private var isVoiceCallEnabled = false
-    private var isTestButtonsEnabled = false
-
-    private var fabInitialXPosition: Float? = null
-    private var fabInitialYPosition: Float? = null
-
-    private var buildInitiated = false
-    var buildComplete = false
-        private set
-
-    //callbacks
-    var supportButtonOnClickCallback: SupportButtonOnClickCallback? = null
+    //region callbacks
+    var supportFabOnClickBuilderCallback: SupportFabOnClickBuilderCallback? = null
     var fabCallback: FabCallbacks? = null
+    //endregion
 
     //region builder
-    fun enableLiveVideoCallOption(b: Boolean = true): ChatSupportBuilder {
+    fun enableLiveVideoCallOption(b: Boolean = true): ChatSupportComponentBuilder {
         isVideoChatEnabled = b
         return this
     }
 
-    fun enableLiveTextChatOption(b: Boolean = true): ChatSupportBuilder {
+    fun enableLiveTextChatOption(b: Boolean = true): ChatSupportComponentBuilder {
         isTextChatEnabled = b
         return this
     }
 
-    fun enableLiveVoiceCallOption(b: Boolean = true): ChatSupportBuilder {
+    fun enableLiveVoiceCallOption(b: Boolean = true): ChatSupportComponentBuilder {
         isVoiceCallEnabled = b
         return this
     }
 
-    fun enableTestOptions(b: Boolean = true): ChatSupportBuilder {
+    fun enableTestOptions(b: Boolean = true): ChatSupportComponentBuilder {
         isTestButtonsEnabled = b
         return this
     }
 
-    fun enableDrag(b: Boolean = true): ChatSupportBuilder {
+    fun enableDrag(b: Boolean = true): ChatSupportComponentBuilder {
         isDragEnabled = b
         return this
     }
 
-    fun enableSideGravity(b: Boolean = true): ChatSupportBuilder {
+    fun enableSideGravity(b: Boolean = true): ChatSupportComponentBuilder {
         isSideGravityEnabled = b
         return this
     }
 
-    fun setMargin(left: Int, top: Int, right: Int, bottom: Int): ChatSupportBuilder {
+    fun setMargin(left: Int, top: Int, right: Int, bottom: Int): ChatSupportComponentBuilder {
         marginLeft = left
         marginTop = top
         marginRight = right
@@ -123,7 +144,7 @@ class ChatSupportBuilder{
         return this
     }
 
-    fun setMargin(all: Int): ChatSupportBuilder {
+    fun setMargin(all: Int): ChatSupportComponentBuilder {
         marginLeft = all
         marginTop = all
         marginRight = all
@@ -138,9 +159,17 @@ class ChatSupportBuilder{
         return this
     }
 
-    fun setInitialPosition(x:Float?, y:Float?){
+    fun setPosition(x: Float, y: Float) {
         fabInitialXPosition = x
         fabInitialYPosition = y
+    }
+
+    fun setIcon(icon: Int) {
+        this.icon = icon
+    }
+
+    fun isExpanded(b: Boolean) {
+        fabInitiallyExpanded = b
     }
     //endregion
 
@@ -187,7 +216,8 @@ class ChatSupportBuilder{
         isSideGravityEnabled?.let { fab.sideGravityEnabled = it }
 
         //icon
-        fab.setImageResource(R.drawable.ic_question)
+        val icon = this.icon ?: R.drawable.ic_question
+        fab.setImageResource(icon)
         fab.imageTintList =
             ColorStateList.valueOf(fab.context.resources.getColor(R.color.white, null))
 
@@ -208,7 +238,7 @@ class ChatSupportBuilder{
         fab.requestLayout()
 
         //set initial position
-        parentContainer?.let {viewGroup ->
+        parentContainer?.let { viewGroup ->
             viewGroup.post {
                 fabInitialXPosition?.let {
                     fab.x = it
@@ -239,7 +269,8 @@ class ChatSupportBuilder{
                     LayoutParams.WRAP_CONTENT,
                     LayoutParams.WRAP_CONTENT
                 )
-            optionsContainer?.visibility = View.INVISIBLE
+            optionsContainer?.visibility =
+                if (fabInitiallyExpanded == true) View.VISIBLE else View.INVISIBLE
         }
     }
 
@@ -275,7 +306,7 @@ class ChatSupportBuilder{
 
             //click listener
             videoFab.setOnClickListener {
-                supportButtonOnClickCallback?.onVideoCallClicked()
+                supportFabOnClickBuilderCallback?.onVideoCallClicked()
             }
         }
     }
@@ -312,7 +343,7 @@ class ChatSupportBuilder{
 
             //click listener
             textFab.setOnClickListener {
-                supportButtonOnClickCallback?.onTextChatClicked()
+                supportFabOnClickBuilderCallback?.onTextChatClicked()
             }
         }
     }
@@ -349,7 +380,7 @@ class ChatSupportBuilder{
 
             //click listener
             talkFab.setOnClickListener {
-                supportButtonOnClickCallback?.onVoiceCallClicked()
+                supportFabOnClickBuilderCallback?.onVoiceCallClicked()
             }
         }
     }
@@ -484,33 +515,12 @@ class ChatSupportBuilder{
 
     //endregion
 
-    fun addToFragmentActivity(view: FragmentActivity) {
-        //get root view
-        val viewGroup = view.findViewById<ViewGroup>(android.R.id.content)
-        create(viewGroup)
-    }
-
-    fun applyToFab(fab: DraggableFloatingActionButton){
-        val viewGroup = fab.parent as ViewGroup
-        create(viewGroup, fab)
-    }
-
-    fun addToViewGroup(viewGroup: ViewGroup) {
-        parentContainer = viewGroup
-        return create(viewGroup)
-    }
-
-    private fun create(
-        parentViewGroup: ViewGroup,
-        fab: DraggableFloatingActionButton? = null
-    ){
-        parentContainer = parentViewGroup
-        mainFab = fab
+    fun build() {
         if (!buildInitiated && !buildComplete) createViews()
     }
 }
 
-interface SupportButtonOnClickCallback {
+interface SupportFabOnClickBuilderCallback {
     fun onVideoCallClicked()
     fun onVoiceCallClicked()
     fun onTextChatClicked()

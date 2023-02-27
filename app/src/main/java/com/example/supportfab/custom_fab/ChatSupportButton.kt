@@ -1,7 +1,6 @@
 package com.example.supportfab.custom_fab
 
-
-import android.util.Log
+import android.content.Intent
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -9,90 +8,116 @@ import android.view.animation.Animation
 import android.widget.LinearLayout
 import androidx.core.view.children
 import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.LifecycleOwner
 import com.example.supportfab.App
+import com.example.supportfab.EngagementActivity
+import com.example.supportfab.service.DummySupportService
+import com.example.supportfab.service.SupportType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 private const val TAG = "ChatSupportButton"
 
 class ChatSupportButton {
 
+    private lateinit var activity: FragmentActivity
+
     //region top variables
-    private lateinit var builder: ChatSupportBuilder
+    private var builder: ChatSupportComponentBuilder? = null
 
     private val mainFab: DraggableFloatingActionButton?
         get() {
-            return builder.mainFab
+            return builder?.mainFab
         }
 
     private val optionsContainer: LinearLayout?
         get() {
-            return builder.optionsContainer
+            return builder?.optionsContainer
         }
 
     private val isBuildComplete: Boolean
-        get() = builder.buildComplete
+        get() = builder?.buildComplete ?: false
 
-    private var isSupportOngoing = false
     private var isExpanded: Boolean = false
     private var isDraggedWhileOpened = false
     //endregion
 
     //region constructors
-    constructor(view: FragmentActivity) {
-        initBuilder()
-        builder.addToFragmentActivity(view)
+    constructor(activity: FragmentActivity) {
+        this.activity = activity
+        this.builder = ChatSupportComponentBuilder(activity)
+        loadComponentBuilder()
     }
 
-    constructor(viewGroup: ViewGroup) {
-        initBuilder()
-        builder.addToViewGroup(viewGroup)
+    constructor(activity: FragmentActivity, viewGroup: ViewGroup) {
+        this.builder = ChatSupportComponentBuilder(viewGroup)
+        loadComponentBuilder()
     }
 
-    constructor(fab: DraggableFloatingActionButton) {
-        initBuilder()
-        builder.applyToFab(fab)
+    constructor(activity: FragmentActivity, fab: DraggableFloatingActionButton) {
+        this.builder = ChatSupportComponentBuilder(fab)
+        loadComponentBuilder()
     }
 
-    private fun initBuilder() {
+    private fun loadComponentBuilder() {
         //load CMS value here
-        builder = ChatSupportBuilder()
-            .setMargin(24)
-            .enableSideGravity(false)
-            .enableLiveVideoCallOption()
-            .enableLiveTextChatOption()
-            .enableLiveVoiceCallOption()
+        builder?.setMargin(24)
+            ?.enableSideGravity(false)
+            ?.enableLiveVideoCallOption()
+            ?.enableLiveTextChatOption()
+            ?.enableLiveVoiceCallOption()
 
-        builder.supportButtonOnClickCallback = supportButtonOnClickCallback
-        builder.fabCallback = mainFabCallBack
+        //attach callbacks
+        builder?.supportFabOnClickBuilderCallback = supportFabOnClickBuilderCallback
+        builder?.fabCallback = mainFabCallBack
+
+        //finally, call build function
+        builder?.build()
     }
     //endregion
 
     //region animations
     private val showToTopAnimation: Animation?
         get() {
-            return builder.showToTopAnimation
+            return builder?.showToTopAnimation
         }
 
     private val showToBottomAnimation: Animation?
         get() {
-            return builder.showToBottomAnimation
+            return builder?.showToBottomAnimation
         }
 
     private val hideToBottomAnimation: Animation?
         get() {
-            return builder.hideToBottomAnimation
+            return builder?.hideToBottomAnimation
         }
 
     private val hideToTopAnimation: Animation?
         get() {
-            return builder.hideToTopAnimation
+            return builder?.hideToTopAnimation
         }
     //endregion
 
-    //region callbacks
-    var sessionListener: ChatSupportSessionListener? = null
+    //region internal callbacks
+    private var supportFabOnClickBuilderCallback = object : SupportFabOnClickBuilderCallback {
+        override fun onVideoCallClicked() {
+            collapseOptions(false)
+            DummySupportService.instance?.startEngagement(SupportType.VIDEO_CALL)
+            activity.startActivity(Intent(activity, EngagementActivity::class.java))
+        }
 
-    private var supportButtonOnClickCallback: SupportButtonOnClickCallback? = null
+        override fun onVoiceCallClicked() {
+            collapseOptions(false)
+            DummySupportService.instance?.startEngagement(SupportType.VOICE_CALL)
+            activity.startActivity(Intent(activity, EngagementActivity::class.java))
+        }
+
+        override fun onTextChatClicked() {
+            collapseOptions(false)
+            DummySupportService.instance?.startEngagement(SupportType.TEXT_CHAT)
+            activity.startActivity(Intent(activity, EngagementActivity::class.java))
+        }
+    }
 
     private val mainFabCallBack: FabCallbacks = object : FabCallbacks {
         override fun onDragStarted(x: Float, y: Float) {
@@ -107,34 +132,46 @@ class ChatSupportButton {
                 isDraggedWhileOpened = false
                 expandOptions()
             }
-            App.instance.updateFabPosition(x, y)
+
+            App.instance.updateFabPosition(FabPosition(x, y))
         }
 
         override fun onClicked(x: Float, y: Float) {
-            if (isSupportOngoing) { //disable toggle options
-                //todo: open active GLIA chat/call activity
+            if (DummySupportService.instance?.hasEngagement() == true) {
+                activity.startActivity(Intent(activity, EngagementActivity::class.java))
             } else
                 toggleOptions()
         }
     }
     //endregion
 
-    fun setSessionListener(sessionListener: ChatSupportSessionListener): ChatSupportButton {
-        this.sessionListener = sessionListener
-        return this
-    }
+    fun listenToGlobalProperty(scope: CoroutineScope): ChatSupportButton {
+        scope.launch {
 
-    fun lifeCycleOwner(owner: LifecycleOwner): ChatSupportButton {
-        App.instance.fabState.observe(owner) { state ->
+            launch {
+                App.instance.fabPosition.collectLatest { p ->
+                    p?.let {
+                        if (p.x != null && p.y != null) {
+                            builder?.setPosition(p.x, p.y)
+                        }
 
-            //updates the value of initial position
-            builder.setInitialPosition(state.x, state.y)
+                        p.x?.let { mainFab?.x = it }
+                        p.y?.let { mainFab?.y = it }
+                        mainFab?.requestLayout()
+                    }
+                }
+            }
 
-            //request for position update if ever mainFab is already build
-            state.x?.let { mainFab?.x = it }
-            state.y?.let { mainFab?.y = it }
-            mainFab?.requestLayout()
+            launch {
+                App.instance.fabIcon.collectLatest { icon ->
+                    icon?.let {
+                        builder?.setIcon(it)
+                        mainFab?.setImageResource(it)
+                    }
+                }
+            }
         }
+
         return this
     }
 
@@ -224,13 +261,12 @@ class ChatSupportButton {
     }
 }
 
-interface ChatSupportSessionListener {
-    fun onLiveChatSupportStarted(supportType: SupportType)
-    fun onLiveChatSupportEnded()
-}
+data class FabPosition(
+    val x: Float? = null,
+    val y: Float? = null
+)
 
-enum class SupportType {
-    VIDEO_CALL,
-    VOICE_CALL,
-    TEXT_CHAT
+interface SupportFabSharedPropertyController {
+    fun updateFabIcon(icon: Int)
+    fun updateFabPosition(position: FabPosition)
 }
