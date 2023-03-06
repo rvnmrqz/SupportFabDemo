@@ -12,14 +12,16 @@ import android.view.animation.OvershootInterpolator
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlin.math.abs
 
+
 open class DraggableFloatingActionButton : FloatingActionButton, OnTouchListener {
 
     companion object {
-        private const val CLICK_DRAG_TOLERANCE = 20f // Often, there will be a slight, unintentional, drag when the user taps the FAB, so we need to account for this.
+        private const val CLICK_DRAG_TOLERANCE =
+            10f // Often, there will be a slight, unintentional, drag when the user taps the FAB, so we need to account for this.
     }
 
     //callbacks
-    var callback: FabCallbacks? = null
+    var eventCallback: DraggableFabEventCallback? = null
 
     var screenPosition = ScreenPosition.UNKNOWN
         get() {
@@ -33,10 +35,12 @@ open class DraggableFloatingActionButton : FloatingActionButton, OnTouchListener
             }
             return field
         }
+        private set
 
     var dragAbilityEnabled: Boolean = true
-    var sideGravityEnabled: Boolean = true
+    var sideGravityEnabled: Boolean = false
 
+    private var lastAction: Int = -1
     private var downRawX = 0f
     private var downRawY = 0f
     private var dX = 0f
@@ -49,6 +53,7 @@ open class DraggableFloatingActionButton : FloatingActionButton, OnTouchListener
 
     var newX = 0f
     var newY = 0f
+
 
     constructor(context: Context?) : super(context!!) {
         init()
@@ -75,7 +80,7 @@ open class DraggableFloatingActionButton : FloatingActionButton, OnTouchListener
         val action = motionEvent.action
 
         if (action == MotionEvent.ACTION_UP && !dragAbilityEnabled) {
-            callback?.onClicked(x, y)
+            eventCallback?.onClicked(x, y)
         }
 
         return if (action == MotionEvent.ACTION_DOWN && dragAbilityEnabled) {
@@ -83,6 +88,7 @@ open class DraggableFloatingActionButton : FloatingActionButton, OnTouchListener
             downRawY = motionEvent.rawY
             dX = view.x - downRawX
             dY = view.y - downRawY
+            lastAction = MotionEvent.ACTION_DOWN
             false // not Consumed for ripple effect
 
         } else if (action == MotionEvent.ACTION_MOVE && dragAbilityEnabled) {
@@ -115,48 +121,56 @@ open class DraggableFloatingActionButton : FloatingActionButton, OnTouchListener
                 .setDuration(0)
                 .start()
 
-            callback?.onDragStarted(newX, newY)
-            true // Consumed
-
-        } else if (action == MotionEvent.ACTION_UP) {
-
             val upRawX = motionEvent.rawX
             val upRawY = motionEvent.rawY
             val upDX = upRawX - downRawX
             val upDY = upRawY - downRawY
 
-            if (abs(upDX) < CLICK_DRAG_TOLERANCE && abs(upDY) < CLICK_DRAG_TOLERANCE) {
-                // A click
-                callback?.onClicked(newX, newY)
-                false // not Consumed for ripple effect
-
+            //Check for x and y difference first vs drag tolerance since some devices are more sensitive for move events
+            if (abs(upDX) > CLICK_DRAG_TOLERANCE && abs(upDY) > CLICK_DRAG_TOLERANCE) {
+                if (lastAction != MotionEvent.ACTION_MOVE) {
+                    eventCallback?.onDragStarted(newX, newY)
+                }
+                lastAction = MotionEvent.ACTION_MOVE
+            }
+            true // Consumed
+        } else if (action == MotionEvent.ACTION_UP) {
+            if (lastAction == MotionEvent.ACTION_DOWN) {
+                eventCallback?.onClicked(newX, newY)
             } else { // A drag
                 if (!dragAbilityEnabled) return false
 
-                if (sideGravityEnabled) pullToSideGravity()
-                else{
-                    val animator = view.animate()
-                        .x(newX)
-                        .y(newY)
-                        .setDuration(300)
-
-                    val animatorListener = object : AnimatorListener {
-                        override fun onAnimationStart(animation: Animator) {}
-                        override fun onAnimationRepeat(animation: Animator) {}
-                        override fun onAnimationCancel(animation: Animator) {}
-                        override fun onAnimationEnd(animation: Animator) {
-                            animator.setListener(null)
-                            callback?.onDragCompleted(newX, newY)
-                        }
+                if (sideGravityEnabled) {
+                    val potentialX = (parentWidth - viewWidth - layoutParams.rightMargin) / 2f
+                    newX = if (newX > potentialX) {
+                        (parentWidth - viewWidth - layoutParams.rightMargin).toFloat()
+                    } else {
+                        layoutParams.leftMargin.toFloat()
                     }
-                    animator
-                        .setListener(animatorListener)
-                        .start()
                 }
 
-                callback?.onDragStarted(newX, newY)
-                false // not Consumed for ripple effect
+                val animator = view.animate()
+                    .x(newX)
+                    .y(newY)
+                    .setDuration(300)
+
+                val animatorListener = object : AnimatorListener {
+                    override fun onAnimationStart(animation: Animator) {}
+                    override fun onAnimationRepeat(animation: Animator) {}
+                    override fun onAnimationCancel(animation: Animator) {}
+                    override fun onAnimationEnd(animation: Animator) {
+                        animator.setListener(null)
+                        eventCallback?.onDragCompleted(newX, newY)
+                    }
+                }
+
+                animator
+                    .setListener(animatorListener)
+                    .start()
+
+                lastAction = MotionEvent.ACTION_UP
             }
+            false
         } else {
             super.onTouchEvent(motionEvent)
         }
@@ -192,39 +206,6 @@ open class DraggableFloatingActionButton : FloatingActionButton, OnTouchListener
         val requestedX = layoutParams.leftMargin.toFloat()
         val requestedY = (parentHeight - viewHeight - layoutParams.bottomMargin).toFloat()
         animateFabToPosition(requestedX, requestedY, 300)
-    }
-
-    fun pullToSideGravity() {
-        val view = this
-        val layoutParams = view.layoutParams as MarginLayoutParams
-
-        if (sideGravityEnabled) {
-            val potentialX = (parentWidth - viewWidth - layoutParams.rightMargin) / 2f
-            newX = if (newX > potentialX) {
-                (parentWidth - viewWidth - layoutParams.rightMargin).toFloat()
-            } else {
-                layoutParams.leftMargin.toFloat()
-            }
-        }
-
-        val animator = view.animate()
-            .x(newX)
-            .y(newY)
-            .setDuration(300)
-
-        val animatorListener = object : AnimatorListener {
-            override fun onAnimationStart(animation: Animator) {}
-            override fun onAnimationRepeat(animation: Animator) {}
-            override fun onAnimationCancel(animation: Animator) {}
-            override fun onAnimationEnd(animation: Animator) {
-                animator.setListener(null)
-                callback?.onDragCompleted(newX, newY)
-            }
-        }
-
-        animator
-            .setListener(animatorListener)
-            .start()
     }
 
     private fun animateFabToPosition(x: Float, y: Float, duration: Long = 0) {
@@ -267,7 +248,7 @@ enum class ScreenPosition {
     UNKNOWN, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT
 }
 
-interface FabCallbacks {
+interface DraggableFabEventCallback {
     fun onDragStarted(x: Float, y: Float)
     fun onDragCompleted(x: Float, y: Float)
     fun onClicked(x: Float, y: Float)

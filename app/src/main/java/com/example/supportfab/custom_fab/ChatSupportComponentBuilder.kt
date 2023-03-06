@@ -94,7 +94,7 @@ class ChatSupportComponentBuilder {
 
     //region callbacks
     var supportFabOnClickBuilderCallback: SupportFabOnClickBuilderCallback? = null
-    var fabCallback: FabCallbacks? = null
+    var fabCallback: DraggableFabEventCallback? = null
     //endregion
 
     //region builder
@@ -191,7 +191,6 @@ class ChatSupportComponentBuilder {
 
         if (isTestButtonsEnabled) {
             createToggleDragFab()
-            createToggleSideGravity()
             createTogglePositionFab()
         }
 
@@ -257,7 +256,7 @@ class ChatSupportComponentBuilder {
         }
 
         //set callback
-        fab.callback = fabCallback
+        fab.eventCallback = fabCallback
     }
 
     private fun createSubFabContainer() {
@@ -423,56 +422,6 @@ class ChatSupportComponentBuilder {
                     ScreenPosition.TOP_RIGHT -> mainFab?.toBottomRight()
                     else -> {}
                 }
-            }
-        }
-    }
-
-    private fun createToggleSideGravity() {
-        optionsContainer?.let { container ->
-            val context = container.context
-            val fab = ExtendedFloatingActionButton(context)
-            fab.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
-
-            //icon
-            fab.setIconResource(R.drawable.ic_bug)
-            fab.setIconTintResource(R.color.white)
-
-            //background + ripple
-            fab.backgroundTintList =
-                ColorStateList.valueOf(context.resources.getColor(R.color.fab_color, null))
-            fab.setRippleColorResource(R.color.white)
-
-            //text
-            fab.setTextColor(context.resources.getColor(R.color.white, null))
-            fab.text = context.getString(R.string.fab_toggle_side_gravity)
-
-            //add first to view parent before requesting for layoutParams
-            container.addView(fab)
-
-            //set margins
-            val params = (fab.layoutParams as LinearLayout.LayoutParams)
-            params.setMargins(0, 0, 0, 10)
-            fab.layoutParams = params
-            fab.requestLayout()
-
-            //click listener
-            var internalToggleValue = isSideGravityEnabled ?: false
-            fab.setOnClickListener {
-                val newValue: Boolean
-
-                if (isSideGravityEnabled != null) {
-                    newValue = !(isSideGravityEnabled!!)
-                    isSideGravityEnabled = newValue
-                } else if (mainFab?.sideGravityEnabled != null) {
-                    newValue = !(mainFab!!.sideGravityEnabled)
-                    mainFab?.sideGravityEnabled = newValue
-                } else {
-                    newValue = !internalToggleValue
-                    internalToggleValue = newValue
-                }
-
-                mainFab?.sideGravityEnabled = newValue
-                if (newValue) mainFab?.pullToSideGravity()
             }
         }
     }

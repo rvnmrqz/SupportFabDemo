@@ -28,9 +28,9 @@ class DummySupportService {
 
     fun startEngagement(supportType: SupportType) {
         when (supportType) {
-            SupportType.VIDEO_CALL -> App.instance.updateFabIcon(R.drawable.ic_video)
-            SupportType.VOICE_CALL -> App.instance.updateFabIcon(R.drawable.ic_call)
-            SupportType.TEXT_CHAT -> App.instance.updateFabIcon(R.drawable.ic_chat)
+            SupportType.VIDEO_CALL -> App.instance.globalFabStateManager.updateIcon(R.drawable.ic_video)
+            SupportType.VOICE_CALL -> App.instance.globalFabStateManager.updateIcon(R.drawable.ic_call)
+            SupportType.TEXT_CHAT -> App.instance.globalFabStateManager.updateIcon(R.drawable.ic_chat)
         }
 
         onGoingEngagement = Engagement(supportType)
@@ -38,7 +38,7 @@ class DummySupportService {
     }
 
     fun endEngagement() {
-        App.instance.updateFabIcon(R.drawable.ic_question)
+        App.instance.globalFabStateManager.updateIcon(R.drawable.ic_question)
         onGoingEngagement = null
     }
 }
